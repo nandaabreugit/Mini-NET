@@ -4,6 +4,5 @@ __pycache__/
 *.pyd
 .vscode/
 .DS_Store
-teste_*.py
 temp/
 logs/
