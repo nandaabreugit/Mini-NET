@@ -22,9 +22,12 @@ class CamadaAplicacao:
             if msg['type'] == 'chat':
                 print(f"\n[{msg['timestamp']}] {msg['sender']}: {msg['message']}")
                 print(">>> ", end='', flush=True)
+            elif msg['type'] == 'sistema':
+                print(f"\n*** {msg['message']} ***")
+                print(">>> ", end='', flush=True)
         except Exception as e:
-            log_aplicacao(f"erro ao processar: {e}")
-    
+            log_aplicacao(f"erro: {e}")
+            
     def iniciar_interface(self):
         def ler_teclado():
             while self.executando:
