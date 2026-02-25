@@ -52,3 +52,19 @@ class CamadaTransporte:
         ack = Segmento(seq_num, True, {})
         log_transporte(f"enviando ack para seq={seq_num}")
         self.callback_enviar(ack.to_dict())
+
+    def iniciar(self):
+        def verificar_timeout():
+            while self.executando:
+                if self.ultimo_enviado and not self.ack_recebido.is_set():
+                    log_transporte(f"timeout! retransmitindo segmento {self.seq_num_enviar}")
+                    self.callback_enviar(self.ultimo_enviado)
+                    time.sleep(self.timeout_segundos)
+                else:
+                    time.sleep(0.1)
+        
+        self.thread_timeout = threading.Thread(target=verificar_timeout, daemon=True)
+        self.thread_timeout.start()
+    
+    def parar(self):
+        self.executando = False
