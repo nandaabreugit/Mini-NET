@@ -8,31 +8,37 @@ from utils import log_aplicacao, log_erro
 from camada_aplicacao import CamadaAplicacao
 from camada_transporte import CamadaTransporte
 from camada_rede import CamadaRede
+from camada_enlace import CamadaEnlace
+
 
 class Cliente:
     def __init__(self):
+        #cria socket e inicializa camadas
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((config.CLIENTE_IP, config.CLIENTE_PORTA))
         self.socket.settimeout(0.5)
         self.executando = True
         
-        self.transporte = CamadaTransporte(self._enviar_fisica)
-        self.aplicacao = CamadaAplicacao("Cliente", self.transporte.enviar_segmento)
+        self.enlace = CamadaEnlace(config.MAC_CLIENTE, self._enviar_fisica)
         self.rede = CamadaRede(config.VIP_CLIENTE, self.enlace.enviar_quadro)
+        self.transporte = CamadaTransporte(self._enviar_rede)
+        self.aplicacao = CamadaAplicacao("Cliente", self.transporte.enviar_segmento)
+
+        self.enlace.definir_callback_recebimento(self.rede.receber_pacote)
+        self.rede.definir_callback_recebimento(self.transporte.receber_segmento)
         
         self.transporte.callback_recebido = self.aplicacao.receber_mensagem
         self.transporte.iniciar()
 
+    def _enviar_rede(self, dados_transporte):
+        self.rede.enviar_pacote(dados_transporte, config.VIP_SERVIDOR)
+
     
-    def _enviar_fisica(self, dados, destino=None):
-        if destino is None:
-            destino = (config.SERVIDOR_IP, config.SERVIDOR_PORTA)
-        from protocolo import enviar_pela_rede_ruidosa
-        import json
-        bytes_dados = json.dumps(dados).encode()
-        enviar_pela_rede_ruidosa(self.socket, bytes_dados, destino)
+    def _enviar_fisica(self, bytes_dados, endereco_destino):
+        enviar_pela_rede_ruidosa(self.socket, bytes_dados, endereco_destino)
     
     def iniciar(self):
+        #inicia interface e loop de recebimento
         log_aplicacao(f"cliente iniciado")
         print(">>> ", end='', flush=True)
         self.aplicacao.iniciar_interface()
@@ -41,9 +47,7 @@ class Cliente:
             while self.executando:
                 try:
                     dados, endereco = self.socket.recvfrom(4096)
-                    import json
-                    dados_dict = json.loads(dados.decode())
-                    self.transporte.receber_segmento(dados_dict)
+                    self.enlace.receber_bytes(dados, endereco)
                 except socket.timeout:
                     continue
                 except Exception as e:
@@ -53,6 +57,7 @@ class Cliente:
             self.parar()
     
     def parar(self):
+        #fecha recursos do cliente
         self.executando = False
         self.transporte.parar()
         self.aplicacao.parar()

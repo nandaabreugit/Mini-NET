@@ -4,6 +4,7 @@ from utils import log_transporte
 
 class CamadaTransporte:
     def __init__(self, callback_enviar_rede):
+        #inicia controle de envio confiavel
         self.callback_enviar = callback_enviar_rede
         self.callback_recebido = None
         
@@ -16,6 +17,7 @@ class CamadaTransporte:
         self.executando = True
         
     def enviar_segmento(self, dados_aplicacao):
+        #cria segmento e inicia espera de ack
         from protocolo import Segmento
         segmento = Segmento(self.seq_num_enviar, False, dados_aplicacao)
         segmento_dict = segmento.to_dict()
@@ -25,6 +27,7 @@ class CamadaTransporte:
         self.callback_enviar(segmento_dict)
 
     def receber_segmento(self, segmento_dict):
+        #trata ack ou payload recebido
         from protocolo import Segmento
         is_ack = segmento_dict.get('is_ack', False)
         seq_num = segmento_dict.get('seq_num', 0)
@@ -48,6 +51,7 @@ class CamadaTransporte:
                 self._enviar_ack(1 - seq_num)
     
     def _enviar_ack(self, seq_num):
+        #envia confirmacao para o emissor
         from protocolo import Segmento
         ack = Segmento(seq_num, True, {})
         log_transporte(f"enviando ack para seq={seq_num}")
@@ -55,6 +59,7 @@ class CamadaTransporte:
 
     def iniciar(self):
         def verificar_timeout():
+            #reenvia segmento quando timeout ocorre
             while self.executando:
                 if self.ultimo_enviado and not self.ack_recebido.is_set():
                     log_transporte(f"timeout! retransmitindo segmento {self.seq_num_enviar}")
@@ -67,4 +72,5 @@ class CamadaTransporte:
         self.thread_timeout.start()
     
     def parar(self):
+        #encerra thread de timeout
         self.executando = False

@@ -8,6 +8,7 @@ from camada_enlace import CamadaEnlace
 
 class Roteador:
     def __init__(self):
+        #inicia socket e tabela de rotas
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((config.ROTEADOR_IP, config.ROTEADOR_PORTA))
         self.socket.settimeout(0.5)
@@ -19,9 +20,11 @@ class Roteador:
         }
     
     def _enviar_fisica(self, bytes_dados, endereco):
+        #envia bytes para proximo no
         enviar_pela_rede_ruidosa(self.socket, bytes_dados, endereco)
     
     def processar_pacote(self, pacote_dict, endereco_origem):
+        #processa ttl e encaminha pacote
         log_rede(f"roteador recebeu: {pacote_dict.get('src_vip')} -> {pacote_dict.get('dst_vip')}")
         
         destino = pacote_dict.get('dst_vip')
@@ -43,6 +46,7 @@ class Roteador:
             log_rede(f"rota desconhecida para {destino}")
     
     def iniciar(self):
+        #loop de recebimento do roteador
         log_rede("roteador iniciado")
         try:
             while self.executando:
@@ -58,6 +62,7 @@ class Roteador:
             self.parar()
     
     def parar(self):
+        #fecha socket e encerra roteador
         self.executando = False
         self.socket.close()
 

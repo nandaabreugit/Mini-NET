@@ -6,11 +6,13 @@ from utils import log_aplicacao, criar_mensagem_json
 
 class CamadaAplicacao:
     def __init__(self, nome_usuario, callback_enviar):
+        #guarda nome e callback de envio
         self.nome = nome_usuario
         self.callback_enviar = callback_enviar
         self.executando = True
         
     def enviar_mensagem(self, mensagem):
+        #monta mensagem json e envia
         msg_json = criar_mensagem_json("chat", self.nome, mensagem)
         log_aplicacao(f"criando mensagem: {msg_json}")
         if self.callback_enviar:
@@ -18,6 +20,7 @@ class CamadaAplicacao:
     
     def receber_mensagem(self, dados_json):
         try:
+            #converte json e mostra no terminal
             msg = json.loads(dados_json) if isinstance(dados_json, str) else dados_json
             if msg['type'] == 'chat':
                 print(f"\n[{msg['timestamp']}] {msg['sender']}: {msg['message']}")
@@ -30,6 +33,7 @@ class CamadaAplicacao:
             
     def iniciar_interface(self):
         def ler_teclado():
+            #le entrada e envia mensagens
             while self.executando:
                 try:
                     texto = input()
@@ -45,4 +49,5 @@ class CamadaAplicacao:
         return thread
     
     def parar(self):
+        #para a interface
         self.executando = False
