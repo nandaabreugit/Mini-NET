@@ -3,11 +3,13 @@ import time
 from utils import log_transporte
 
 class CamadaTransporte:
-    def __init__(self, callback_enviar_rede, nome="transporte"):
+    def __init__(self, callback_enviar_rede, nome="transporte", gui=None):
         self.callback_enviar = callback_enviar_rede
         self.callback_recebido = None
         
         self.nome = nome
+        self.gui = gui
+        
         self.seq_num_enviar = 0
         self.ultimo_enviado = None
         self.ultimo_seq_enviado = None
@@ -33,12 +35,16 @@ class CamadaTransporte:
                         self.tentativas += 1
                         if self.tentativas > self.max_tentativas:
                             log_transporte(f"{self.nome}: MAXIMO TENTATIVAS, desistindo")
+                            if self.gui:
+                                self.gui.adicionar_mensagem_sistema("Maximo de tentativas atingido")
                             self.ultimo_enviado = None
                             self.ultimo_seq_enviado = None
                             self.tentativas = 0
                             self.ack_recebido.set()
                         else:
                             log_transporte(f"{self.nome}: TIMEOUT! reenviando SEQ={self.ultimo_seq_enviado} (tentativa {self.tentativas})")
+                            if self.gui:
+                                self.gui.atualizar_retransmissao()
                             self.callback_enviar(self.ultimo_enviado)
         
         self.timeout_thread = threading.Thread(target=verificar_timeout, daemon=True)
@@ -63,6 +69,10 @@ class CamadaTransporte:
             self.ack_recebido.clear()
             self.tentativas = 1
             self.callback_enviar(segmento_dict)
+            
+            if self.gui:
+                self.gui.estatisticas['enviados'] += 1
+                
             return True
 
     def receber_segmento(self, segmento_dict):
@@ -100,6 +110,9 @@ class CamadaTransporte:
                     
                     self.seq_num_esperado = 1 - self.seq_num_esperado
                     log_transporte(f"{self.nome}: proximo SEQ esperado = {self.seq_num_esperado}")
+                    
+                    if self.gui:
+                        self.gui.estatisticas['recebidos'] += 1
                 else:
                     log_transporte(f"{self.nome}: segmento duplicado SEQ={seq_num}, reenviando ACK")
                     self._enviar_ack(1 - seq_num)
