@@ -20,7 +20,7 @@ class Servidor:
         self.cliente_endereco = None
         
         self.enlace = CamadaEnlace(config.MAC_SERVIDOR, self._enviar_fisica)
-        self.rede = CamadaRede(config.VIP_SERVIDOR, self.enlace.enviar_quadro)
+        self.rede = CamadaRede(config.VIP_SERVIDOR, self.enlace.enviar_quadro, usar_roteador=True)
         self.transporte = CamadaTransporte(self._enviar_rede)
         self.aplicacao = CamadaAplicacao("Servidor", self.transporte.enviar_segmento)
 

@@ -20,7 +20,7 @@ class Cliente:
         self.executando = True
         
         self.enlace = CamadaEnlace(config.MAC_CLIENTE, self._enviar_fisica)
-        self.rede = CamadaRede(config.VIP_CLIENTE, self.enlace.enviar_quadro)
+        self.rede = CamadaRede(config.VIP_CLIENTE, self.enlace.enviar_quadro, usar_roteador=True)
         self.transporte = CamadaTransporte(self._enviar_rede)
         self.aplicacao = CamadaAplicacao("Cliente", self.transporte.enviar_segmento)
 
