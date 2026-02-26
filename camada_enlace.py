@@ -1,11 +1,9 @@
-#camda enlace
 from protocolo import Quadro
 from utils import log_enlace, log_fisica
 import config
 
 class CamadaEnlace:
     def __init__(self, meu_mac, callback_enviar_fisica):
-        #define mac local e callback fisico
         self.meu_mac = meu_mac
         self.callback_enviar = callback_enviar_fisica
         self.callback_recebido = None
@@ -17,7 +15,6 @@ class CamadaEnlace:
         }
     
     def enviar_quadro(self, dados_rede, endereco_destino):
-        #monta quadro e envia bytes
         mac_destino = self._ip_para_mac(endereco_destino[0])
         quadro = Quadro(self.meu_mac, mac_destino, dados_rede)
         bytes_quadro = quadro.serializar()
@@ -26,7 +23,7 @@ class CamadaEnlace:
         log_fisica(f"enviando {len(bytes_quadro)} bytes")
         self.callback_enviar(bytes_quadro, endereco_destino)
     
-        def receber_bytes(self, bytes_recebidos, endereco_origem):
+    def receber_bytes(self, bytes_recebidos, endereco_origem):
         log_fisica(f"recebidos {len(bytes_recebidos)} bytes")
         quadro_dict, valido = Quadro.deserializar(bytes_recebidos)
         
@@ -43,8 +40,8 @@ class CamadaEnlace:
         
         if self.callback_recebido:
             self.callback_recebido(quadro_dict.get('data'), endereco_origem)
+    
     def _ip_para_mac(self, ip):
-        #resolve mac conforme ip
         if ip == config.CLIENTE_IP:
             return config.MAC_CLIENTE
         elif ip == config.SERVIDOR_IP:
@@ -54,5 +51,4 @@ class CamadaEnlace:
         return "FF:FF:FF:FF:FF:FF"
     
     def definir_callback_recebimento(self, callback):
-        #define callback da camada acima
         self.callback_recebido = callback
