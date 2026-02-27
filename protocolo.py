@@ -16,14 +16,14 @@ import socket
 
 # --- CONFIGURAÇÃO DA SIMULAÇÃO ---
 # Chance de um pacote ser totalmente perdido (0.0 a 1.0)
-PROBABILIDADE_PERDA = 0.2  # 20%
+PROBABILIDADE_PERDA = 0.0  # Temporariamente desativado para debug
 
 # Chance de um pacote sofrer corrupção de bits (0.0 a 1.0)
-PROBABILIDADE_CORRUPCAO = 0.2 # 20%
+PROBABILIDADE_CORRUPCAO = 0.0 # Temporariamente desativado para debug
 
 # Tempo de atraso simulado na rede (latência)
-LATENCIA_MIN = 0.1
-LATENCIA_MAX = 0.5
+LATENCIA_MIN = 0.01
+LATENCIA_MAX = 0.02
 
 # =================================================================
 # CAMADA 4: TRANSPORTE (Segmento)

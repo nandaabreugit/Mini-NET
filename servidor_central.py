@@ -1,6 +1,7 @@
 import socket
 import sys
 import threading
+import json
 from protocolo import enviar_pela_rede_ruidosa
 import config
 from utils import log_aplicacao, log_erro
@@ -35,7 +36,6 @@ class ServidorCentral:
 
     def _processar_mensagem_recebida(self, dados_json):
         try:
-            import json
             msg = json.loads(dados_json) if isinstance(dados_json, str) else dados_json
             
             remetente = msg.get('sender', 'Desconhecido')
@@ -43,6 +43,7 @@ class ServidorCentral:
             timestamp = msg.get('timestamp', '')
             
             log_aplicacao(f"Mensagem de {remetente}: {mensagem}")
+            log_aplicacao(f"_processar_mensagem_recebida payload raw: {msg}")
             
             if remetente == "Cliente_A":
                 destino = config.VIP_CLIENTE_B
@@ -61,14 +62,25 @@ class ServidorCentral:
                 "timestamp": timestamp
             }
             
-            self.transporte.enviar_segmento(msg_encaminhada)
+            # Envie diretamente o segmento com destino lógico, evitando wrappers aninhados
+            self.transporte.enviar_segmento(msg_encaminhada, destino_vip=destino)
             
         except Exception as e:
             log_erro(f"Erro ao processar mensagem: {e}")
     
     def _enviar_rede(self, dados_transporte):
-        self.rede.enviar_pacote(dados_transporte, config.VIP_CLIENTE_A)
-        self.rede.enviar_pacote(dados_transporte, config.VIP_CLIENTE_B)
+        try:
+            if isinstance(dados_transporte, dict) and '_dst_vip' in dados_transporte:
+                destino = dados_transporte.pop('_dst_vip')
+                # enviar o segmento (dados_transporte) para o VIP destino
+                self.rede.enviar_pacote(dados_transporte, destino)
+                return
+            
+            # fallback: comportamento legacy - não sabemos o destino, enviar broadcast
+            self.rede.enviar_pacote(dados_transporte, config.VIP_CLIENTE_A)
+            self.rede.enviar_pacote(dados_transporte, config.VIP_CLIENTE_B)
+        except Exception as e:
+            log_erro(f"_enviar_rede erro: {e}")
     
     def _enviar_fisica(self, bytes_dados, endereco_destino):
         enviar_pela_rede_ruidosa(self.socket, bytes_dados, endereco_destino)
@@ -77,14 +89,6 @@ class ServidorCentral:
         while self.executando:
             try:
                 dados, endereco = self.socket.recvfrom(4096)
-                
-                if endereco[1] == config.CLIENTE_A_PORTA and not self.cliente_a_conectado:
-                    self.cliente_a_conectado = True
-                    log_aplicacao(f"Cliente A conectado de {endereco}")
-                elif endereco[1] == config.CLIENTE_B_PORTA and not self.cliente_b_conectado:
-                    self.cliente_b_conectado = True
-                    log_aplicacao(f"Cliente B conectado de {endereco}")
-                
                 self.enlace.receber_bytes(dados, endereco)
             except socket.timeout:
                 continue

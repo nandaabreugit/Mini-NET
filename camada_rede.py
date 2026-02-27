@@ -64,6 +64,12 @@ class CamadaRede:
         
         if dst == self.meu_vip:
             log_rede(f"pacote chegou ao DESTINO {self.meu_vip}")
+            data = pacote_dict.get('data')
+            if isinstance(data, dict):
+                data['_src_vip'] = src
+                pacote_dict['_src_vip'] = src
+                pacote_dict['data'] = data
+
             if self.callback_recebido:
                 self.callback_recebido(pacote_dict.get('data'))
         else:

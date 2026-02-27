@@ -217,11 +217,25 @@ class ClienteAGUI:
         self.text_chat.config(state=tk.DISABLED)
     
     def adicionar_mensagem_outro(self, remetente, mensagem, hora):
+        # Verificar se é mensagem privada para este cliente
+        if self.cliente and hasattr(self.cliente, 'vip'):
+            if "[Privado" in mensagem:
+                if self.cliente.vip == config.VIP_CLIENTE_A and "Cliente A" in mensagem:
+                    mensagem_real = mensagem.split("] ", 1)[-1] if "] " in mensagem else mensagem
+                elif self.cliente.vip == config.VIP_CLIENTE_B and "Cliente B" in mensagem:
+                    mensagem_real = mensagem.split("] ", 1)[-1] if "] " in mensagem else mensagem
+                else:
+                    return
+            else:
+                mensagem_real = mensagem
+        else:
+            mensagem_real = mensagem
+        
         self.text_chat.config(state=tk.NORMAL)
         
         self.text_chat.insert(tk.END, f"[{hora}] ", "time")
         self.text_chat.insert(tk.END, f"{remetente}:\n", "other")
-        self.text_chat.insert(tk.END, f"{mensagem}\n\n")
+        self.text_chat.insert(tk.END, f"{mensagem_real}\n\n")
         
         self.text_chat.see(tk.END)
         self.text_chat.config(state=tk.DISABLED)

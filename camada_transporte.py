@@ -14,7 +14,8 @@ class CamadaTransporte:
         self.ultimo_enviado = None
         self.ultimo_seq_enviado = None
         self.ack_recebido = threading.Event()
-        self.seq_num_esperado = 0
+        # map: src_vip -> seq_num esperado (suporta múltiplos pares simultâneos)
+        self.seq_num_esperado_by_vip = {}
         
         self.ultimo_ack_recebido = -1
         self.ultimo_ack_enviado = -1
@@ -25,6 +26,7 @@ class CamadaTransporte:
         self.max_tentativas = 10
         self.lock = threading.Lock()
         self.ultima_mensagem_recebida = None
+        self.ultimo_origem_vip = None
         
     def iniciar(self):
         def verificar_timeout():
@@ -51,7 +53,7 @@ class CamadaTransporte:
         self.timeout_thread.start()
         log_transporte(f"{self.nome}: camada de transporte iniciada")
         
-    def enviar_segmento(self, dados_aplicacao):
+    def enviar_segmento(self, dados_aplicacao, destino_vip=None):
         from protocolo import Segmento
 
         with self.lock:
@@ -61,6 +63,9 @@ class CamadaTransporte:
 
             segmento = Segmento(self.seq_num_enviar, False, dados_aplicacao)
             segmento_dict = segmento.to_dict()
+            # Permite anexar destino lógico (VIP) ao segmento para roteamento
+            if destino_vip:
+                segmento_dict['_dst_vip'] = destino_vip
             log_transporte(f"{self.nome}: enviando segmento SEQ={self.seq_num_enviar}")
 
             self.ultimo_enviado = segmento_dict
@@ -82,6 +87,7 @@ class CamadaTransporte:
             is_ack = segmento_dict.get('is_ack', False)
             seq_num = segmento_dict.get('seq_num', 0)
             payload = segmento_dict.get('payload', {})
+            src_vip = segmento_dict.get('_src_vip')
             
             if is_ack:
                 log_transporte(f"{self.nome}: ACK recebido para SEQ={seq_num}")
@@ -98,24 +104,40 @@ class CamadaTransporte:
                     else:
                         log_transporte(f"{self.nome}: ACK ignorado (esperava {self.ultimo_seq_enviado}, recebeu {seq_num})")
             else:
-                log_transporte(f"{self.nome}: segmento recebido SEQ={seq_num}, esperado={self.seq_num_esperado}")
+                # usa seq esperado por VIP de origem; se não houver estado, aceite o primeiro
+                expected = self.seq_num_esperado_by_vip.get(src_vip)
+                if expected is None:
+                    # aceita o primeiro segmento recebido (pode ser 0 ou 1)
+                    expected = seq_num
+                    self.seq_num_esperado_by_vip[src_vip] = expected
+                log_transporte(f"{self.nome}: segmento recebido SEQ={seq_num}, esperado={expected}, origem={src_vip}")
 
-                if seq_num == self.seq_num_esperado:
+                if seq_num == expected:
+                    try:
+                        self.ultimo_origem_vip = segmento_dict.pop('_src_vip', None)
+                    except Exception:
+                        self.ultimo_origem_vip = None
+
                     self._enviar_ack(seq_num)
-                    
+
                     if payload and payload != self.ultima_mensagem_recebida:
                         self.ultima_mensagem_recebida = payload
                         if self.callback_recebido:
-                            self.callback_recebido(payload)
-                    
-                    self.seq_num_esperado = 1 - self.seq_num_esperado
-                    log_transporte(f"{self.nome}: proximo SEQ esperado = {self.seq_num_esperado}")
-                    
+                            log_transporte(f"{self.nome}: entregando payload à camada superior: {payload}")
+                            try:
+                                self.callback_recebido(payload)
+                            except Exception as e:
+                                log_transporte(f"{self.nome}: erro ao chamar callback_recebido: {e}")
+
+                    # atualiza seq esperado para esta origem
+                    self.seq_num_esperado_by_vip[src_vip] = 1 - expected
+                    log_transporte(f"{self.nome}: proximo SEQ esperado para {src_vip} = {self.seq_num_esperado_by_vip[src_vip]}")
+
                     if self.gui:
                         self.gui.estatisticas['recebidos'] += 1
                 else:
-                    log_transporte(f"{self.nome}: segmento duplicado SEQ={seq_num}, reenviando ACK")
-                    self._enviar_ack(1 - seq_num)
+                    log_transporte(f"{self.nome}: segmento duplicado SEQ={seq_num}, origem={src_vip}, reenviando ACK")
+                    self._enviar_ack(seq_num)
         except Exception as e:
             log_transporte(f"{self.nome}: ERRO ao receber segmento: {e}")
     
@@ -128,8 +150,14 @@ class CamadaTransporte:
                 return
 
             ack = Segmento(seq_num, True, {})
+            ack_dict = ack.to_dict()
+
+            if hasattr(self, 'ultimo_origem_vip') and self.ultimo_origem_vip:
+                ack_dict['_dst_vip'] = self.ultimo_origem_vip
+                log_transporte(f"{self.nome}: ACK direcionado para {self.ultimo_origem_vip}")
+
             log_transporte(f"{self.nome}: enviando ACK para SEQ={seq_num}")
-            self.callback_enviar(ack.to_dict())
+            self.callback_enviar(ack_dict)
             self.ultimo_ack_enviado = seq_num
     
     def parar(self):

@@ -20,26 +20,52 @@ class CamadaAplicacao:
     
     def receber_mensagem(self, dados_json):
         try:
-            msg = json.loads(dados_json) if isinstance(dados_json, str) else dados_json
+            # Normaliza o formato da mensagem recebida.
+            if isinstance(dados_json, str):
+                try:
+                    msg = json.loads(dados_json)
+                except Exception:
+                    log_aplicacao("Recebido dado string inválido")
+                    return
+            elif isinstance(dados_json, dict):
+                msg = dados_json
+            else:
+                log_aplicacao("Formato de dado desconhecido recebido na aplicação")
+                return
+
+            # Se for um wrapper, desembrulhe (ex.: {'payload': {...}})
+            if isinstance(msg, dict) and 'payload' in msg and isinstance(msg['payload'], dict):
+                inner = msg['payload']
+                # tratar casos onde há wrapper adicional
+                if 'type' in inner:
+                    msg = inner
+
+            if 'type' not in msg:
+                log_aplicacao(f"Mensagem sem tipo ignorada: {msg}")
+                return
+
             if msg['type'] == 'chat':
-                self.ultimo_remetente = msg['sender']
-                self.ultima_mensagem = msg['message']
-                
-                if self.gui:
-                    self.gui.adicionar_mensagem_outro(
-                        msg['sender'],
-                        msg['message'],
-                        msg['timestamp']
-                    )
+                if msg.get('sender') != self.nome:
+                    self.ultimo_remetente = msg.get('sender')
+                    self.ultima_mensagem = msg.get('message')
+
+                    if self.gui:
+                        self.gui.adicionar_mensagem_outro(
+                            msg.get('sender'),
+                            msg.get('message'),
+                            msg.get('timestamp')
+                        )
+                    else:
+                        print(f"\n[{msg.get('timestamp')}] {msg.get('sender')}: {msg.get('message')}")
+                        print(">>> ", end='', flush=True)
                 else:
-                    print(f"\n[{msg['timestamp']}] {msg['sender']}: {msg['message']}")
-                    print(">>> ", end='', flush=True)
-                    
+                    log_aplicacao(f"Mensagem propria ignorada: {msg.get('message')}")
+
             elif msg['type'] == 'sistema':
                 if self.gui:
-                    self.gui.adicionar_mensagem_sistema(msg['message'])
+                    self.gui.adicionar_mensagem_sistema(msg.get('message'))
                 else:
-                    print(f"\n*** {msg['message']} ***")
+                    print(f"\n*** {msg.get('message')} ***")
                     print(">>> ", end='', flush=True)
         except Exception as e:
             log_aplicacao(f"erro ao receber: {e}")

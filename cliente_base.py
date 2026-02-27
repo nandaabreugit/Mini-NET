@@ -46,7 +46,13 @@ class ClienteBase:
         print(f"{nome} inicializado com sucesso!")
 
     def _enviar_rede(self, dados_transporte):
-        self.rede.enviar_pacote(dados_transporte, config.VIP_SERVIDOR)
+        destino = config.VIP_SERVIDOR
+
+        if isinstance(dados_transporte, dict) and '_dst_vip' in dados_transporte:
+            destino = dados_transporte.pop('_dst_vip')
+
+        # Envia o segmento para o VIP determinado
+        self.rede.enviar_pacote(dados_transporte, destino)
     
     def _enviar_fisica(self, bytes_dados, endereco_destino):
         enviar_pela_rede_ruidosa(self.socket, bytes_dados, endereco_destino)
