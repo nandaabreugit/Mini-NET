@@ -18,7 +18,6 @@ class CamadaTransporte:
         self.seq_num_esperado_by_vip = {}
         
         self.ultimo_ack_recebido = -1
-        self.ultimo_ack_enviado = -1
         self.timeout_segundos = 3
         self.executando = True
         self.timeout_thread = None
@@ -114,11 +113,11 @@ class CamadaTransporte:
 
                 if seq_num == expected:
                     try:
-                        self.ultimo_origem_vip = segmento_dict.pop('_src_vip', None)
+                        self.ultimo_origem_vip = segmento_dict.get('_src_vip')
                     except Exception:
                         self.ultimo_origem_vip = None
 
-                    self._enviar_ack(seq_num)
+                    self._enviar_ack(seq_num, destino_vip=src_vip)
 
                     if payload and payload != self.ultima_mensagem_recebida:
                         self.ultima_mensagem_recebida = payload
@@ -137,28 +136,24 @@ class CamadaTransporte:
                         self.gui.estatisticas['recebidos'] += 1
                 else:
                     log_transporte(f"{self.nome}: segmento duplicado SEQ={seq_num}, origem={src_vip}, reenviando ACK")
-                    self._enviar_ack(seq_num)
+                    self._enviar_ack(seq_num, destino_vip=src_vip)
         except Exception as e:
             log_transporte(f"{self.nome}: ERRO ao receber segmento: {e}")
     
-    def _enviar_ack(self, seq_num):
+    def _enviar_ack(self, seq_num, destino_vip=None):
         from protocolo import Segmento
 
         with self.lock:
-            if seq_num == self.ultimo_ack_enviado:
-                log_transporte(f"{self.nome}: ACK duplicado SEQ={seq_num}, ignorando envio")
-                return
-
             ack = Segmento(seq_num, True, {})
             ack_dict = ack.to_dict()
 
-            if hasattr(self, 'ultimo_origem_vip') and self.ultimo_origem_vip:
-                ack_dict['_dst_vip'] = self.ultimo_origem_vip
-                log_transporte(f"{self.nome}: ACK direcionado para {self.ultimo_origem_vip}")
+            destino = destino_vip or getattr(self, 'ultimo_origem_vip', None)
+            if destino:
+                ack_dict['_dst_vip'] = destino
+                log_transporte(f"{self.nome}: ACK direcionado para {destino}")
 
             log_transporte(f"{self.nome}: enviando ACK para SEQ={seq_num}")
             self.callback_enviar(ack_dict)
-            self.ultimo_ack_enviado = seq_num
     
     def parar(self):
         self.executando = False
